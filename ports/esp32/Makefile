@@ -128,6 +128,8 @@ MICROPY_BLUETOOTH_NIMBLE_BINDINGS_ONLY = 1
 include $(TOP)/extmod/nimble/nimble.mk
 endif
 
+M5STACK := $(TOP)/lib/m5stack
+
 # include sdkconfig to get needed configuration values
 include $(SDKCONFIG)
 
@@ -136,6 +138,9 @@ include $(SDKCONFIG)
 
 INC += -I.
 INC += -I$(TOP)
+INC += -I$(TOP)/lib/mp-readline
+INC += -I$(TOP)/lib/netutils
+INC += -I$(TOP)/lib/timeutils
 INC += -I$(BUILD)
 
 INC_ESPCOMP += -I$(ESPCOMP)/bootloader_support/include
@@ -186,6 +191,15 @@ INC_ESPCOMP += -I$(ESPCOMP)/app_update/include
 INC_ESPCOMP += -I$(ESPCOMP)/pthread/include
 INC_ESPCOMP += -I$(ESPCOMP)/smartconfig_ack/include
 INC_ESPCOMP += -I$(ESPCOMP)/sdmmc/include
+INC_ESPCOMP += -I$(ESPCOMP)/esp-ili9340/main
+INC_ESPCOMP += -I$(ESPCOMP)/spiffs/include
+INC_ESPCOMP += -I$(ESPCOMP)/log/include
+
+INC_ESPCOMP += -I$(M5STACK)/i2c_bus/include
+INC_ESPCOMP += -I$(M5STACK)/mpu6886/include
+INC_ESPCOMP += -I$(M5STACK)/axp192/include
+INC_ESPCOMP += -I$(M5STACK)/bm8563/include
+INC_ESPCOMP += -I$(M5STACK)/ft6336u/include
 
 ifeq ($(ESPIDF_CURHASH),$(ESPIDF_SUPHASH_V4))
 INC_ESPCOMP += -I$(ESPCOMP)/esp_common/include
@@ -279,7 +293,7 @@ CFLAGS += -DMICROPY_ESP_IDF_4=1
 endif
 
 # this is what ESPIDF uses for c++ compilation
-CXXFLAGS = -std=gnu++11 $(CFLAGS_COMMON) $(INC) $(INC_ESPCOMP) $(CXXFLAGS_MOD)
+CXXFLAGS = -std=gnu++11 $(CFLAGS_COMMON) $(INC) $(INC_ESPCOMP)
 
 LDFLAGS = -nostdlib -Map=$(@:.elf=.map) --cref
 LDFLAGS += --gc-sections -static -EL
@@ -343,6 +357,11 @@ SRC_C = \
 	machine_adc.c \
 	machine_dac.c \
 	machine_i2c.c \
+	machine_i2s.c \
+	machine_axp192.c \
+	machine_bm8563.c \
+	machine_ft6336u.c \
+	machine_mpu6886.c \
 	machine_pwm.c \
 	machine_uart.c \
 	modmachine.c \
@@ -364,9 +383,6 @@ SRC_C = \
 	machine_sdcard.c \
 	$(wildcard $(BOARD_DIR)/*.c) \
 	$(SRC_MOD)
-
-SRC_CXX += \
-	$(SRC_MOD_CXX)
 
 EXTMOD_SRC_C += $(addprefix extmod/,\
 	modonewire.c \
@@ -395,16 +411,13 @@ $(ESPIDFMOD_MODULE): $(ALL_ESPIDFMOD_SRC) $(LVGL_BINDING_DIR)/gen/gen_mpy.py
 	$(Q)$(CPP) $(ESPIDFMOD_CFLAGS) -DPYCPARSER -I $(LVGL_BINDING_DIR)/pycparser/utils/fake_libc_include $(INC) $(INC_ESPCOMP) $(ESPIDFMOD_SOURCE) > $(ESPIDFMOD_PP)
 	$(Q)$(PYTHON) $(LVGL_BINDING_DIR)/gen/gen_mpy.py -M espidf -E $(ESPIDFMOD_PP) $(ESPIDFMOD_SOURCE) > $@
 
-.PHONY: ESPIDF_MPY
-ESPIDF_MPY: $(ESPIDFMOD_MODULE)
-
 LIB_SRC_C += \
 	lib/lv_bindings/driver/esp32/modlvesp32.c \
 	lib/lv_bindings/driver/esp32/modrtch.c \
 	lib/lv_bindings/driver/esp32/espidf.c \
 	lib/lv_bindings/driver/esp32/sh2lib.c \
 	$(ESPIDFMOD_MODULE)
-	
+
 #	lib/lv_bindings/driver/esp32/modxpt2046.c
 #	lib/lv_bindings/driver/esp32/modILI9341.c
 
@@ -416,7 +429,6 @@ DRIVERS_SRC_C = $(addprefix drivers/,\
 OBJ_MP =
 OBJ_MP += $(PY_O)
 OBJ_MP += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
-OBJ_MP += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(EXTMOD_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(LIB_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
@@ -425,7 +437,7 @@ OBJ_MP += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 $(OBJ_MP): CFLAGS += -Wdouble-promotion -Wfloat-conversion
 
 # List of sources for qstr extraction
-SRC_QSTR += $(SRC_C) $(SRC_CXX) $(EXTMOD_SRC_C) $(LIB_SRC_C) $(DRIVERS_SRC_C)
+SRC_QSTR += $(SRC_C) $(EXTMOD_SRC_C) $(LIB_SRC_C) $(DRIVERS_SRC_C)
 # Append any auto-generated sources that are needed by sources listed in SRC_QSTR
 SRC_QSTR_AUTO_DEPS +=
 
@@ -653,6 +665,14 @@ ESPIDF_BT_NIMBLE_O = $(patsubst %.c,%.o,\
 endif
 endif
 
+M5STACK_CORE2_O = $(patsubst %.c,%.o,\
+	$(wildcard $(M5STACK)/mpu6886/*.c) \
+	$(wildcard $(M5STACK)/i2c_bus/*.c) \
+	$(wildcard $(M5STACK)/axp192/*.c) \
+	$(wildcard $(M5STACK)/bm8563/*.c) \
+	$(wildcard $(M5STACK)/ft6336u/*.c) \
+	)
+
 OBJ_ESPIDF =
 LIB_ESPIDF =
 BUILD_ESPIDF_LIB = $(BUILD)/esp-idf
@@ -699,6 +719,7 @@ $(eval $(call gen_espidf_lib_rule,esp_tls,$(ESPIDF_TLS_O)))
 $(eval $(call gen_espidf_lib_rule,wpa_supplicant,$(ESPIDF_WPA_SUPPLICANT_O)))
 $(eval $(call gen_espidf_lib_rule,sdmmc,$(ESPIDF_SDMMC_O)))
 $(eval $(call gen_espidf_lib_rule,bt_nimble,$(ESPIDF_BT_NIMBLE_O)))
+$(eval $(call gen_espidf_lib_rule,m5stack_c_core2,$(M5STACK_CORE2_O)))
 
 ifeq ($(ESPIDF_CURHASH),$(ESPIDF_SUPHASH_V4))
 $(eval $(call gen_espidf_lib_rule,esp_common,$(ESPIDF_ESP_COMMON_O)))
@@ -841,6 +862,22 @@ $(BUILD)/application.elf: $(OBJ) $(LIB) $(BUILD)/esp32_out.ld $(BUILD)/esp32.pro
 	$(ECHO) "LINK $@"
 	$(Q)$(LD) $(LDFLAGS) -o $@ $(APP_LD_ARGS)
 	$(Q)$(SIZE) $@
+
+define compile_cxx
+$(ECHO) "CXX $<"
+$(Q)$(CXX) $(CXXFLAGS) -c -MD -o $@ $<
+@# The following fixes the dependency file.
+@# See http://make.paulandlesley.org/autodep.html for details.
+@# Regex adjusted from the above to play better with Windows paths, etc.
+@$(CP) $(@:.o=.d) $(@:.o=.P); \
+  $(SED) -e 's/#.*//' -e 's/^.*:  *//' -e 's/ *\\$$//' \
+      -e '/^$$/ d' -e 's/$$/ :/' < $(@:.o=.d) >> $(@:.o=.P); \
+  $(RM) -f $(@:.o=.d)
+endef
+
+vpath %.cpp . $(TOP)
+$(BUILD)/%.o: %.cpp
+	$(call compile_cxx)
 
 ################################################################################
 # Declarations to build the bootloader
