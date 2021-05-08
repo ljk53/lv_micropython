@@ -1208,7 +1208,7 @@ int10:
 
     skip_set_cur_row_max:
 
-     	cmp	dl, 79
+	cmp	dl, 79
 	jbe	skip_set_cur_col_max
 
 	; If cursor is moved off the screen, then hide it

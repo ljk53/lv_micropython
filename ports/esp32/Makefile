@@ -129,6 +129,7 @@ include $(TOP)/extmod/nimble/nimble.mk
 endif
 
 M5STACK := $(TOP)/lib/m5stack
+8086TINY := $(TOP)/lib/8086tiny
 
 # include sdkconfig to get needed configuration values
 include $(SDKCONFIG)
@@ -280,7 +281,13 @@ CFLAGS_COMMON = -Os -ffunction-sections -fdata-sections -fstrict-volatile-bitfie
 	-mlongcalls -nostdlib \
 	-Wall -Werror -Wno-error=unused-function -Wno-error=unused-but-set-variable \
 	-Wno-error=unused-variable -Wno-error=deprecated-declarations \
-	-DESP_PLATFORM
+	-Wno-error=strict-aliasing \
+	-Wno-error=unused-value \
+	-Wno-error=parentheses \
+	-Wno-error=logical-not-parentheses \
+	-DESP_PLATFORM \
+	-DNO_GRAPHICS \
+	-DLIBRARY
 
 CFLAGS_BASE = -std=gnu99 $(CFLAGS_COMMON) -DMBEDTLS_CONFIG_FILE='"mbedtls/esp_config.h"' -DHAVE_CONFIG_H
 CFLAGS = $(CFLAGS_BASE) $(INC) $(INC_ESPCOMP) $(INC_NEWLIB)
@@ -673,6 +680,10 @@ M5STACK_CORE2_O = $(patsubst %.c,%.o,\
 	$(wildcard $(M5STACK)/ft6336u/*.c) \
 	)
 
+8086TINY_O = $(patsubst %.c,%.o,\
+	$(wildcard $(8086TINY)/*.c) \
+	)
+
 OBJ_ESPIDF =
 LIB_ESPIDF =
 BUILD_ESPIDF_LIB = $(BUILD)/esp-idf
@@ -720,6 +731,7 @@ $(eval $(call gen_espidf_lib_rule,wpa_supplicant,$(ESPIDF_WPA_SUPPLICANT_O)))
 $(eval $(call gen_espidf_lib_rule,sdmmc,$(ESPIDF_SDMMC_O)))
 $(eval $(call gen_espidf_lib_rule,bt_nimble,$(ESPIDF_BT_NIMBLE_O)))
 $(eval $(call gen_espidf_lib_rule,m5stack_c_core2,$(M5STACK_CORE2_O)))
+$(eval $(call gen_espidf_lib_rule,8086tiny,$(8086TINY_O)))
 
 ifeq ($(ESPIDF_CURHASH),$(ESPIDF_SUPHASH_V4))
 $(eval $(call gen_espidf_lib_rule,esp_common,$(ESPIDF_ESP_COMMON_O)))
